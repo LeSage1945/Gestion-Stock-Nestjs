@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  SUPER_ADMIN_SAGE_066062594
+  ADMIN
+  VENDEUR
+  CAISSIER
+}
+
+enum MethodePaiement {
+  ESPECE
+  MOBILE_MONEY
+}
+
+enum StatutAbonnement {
+  ACTIF
+  INACTIF
+  EXPIRE
+  BLOQUE
+}
+
+model Compte {
+  id     String   @id @default(uuid())
+  code   String   @unique
+  nom    String
+  creeLe DateTime @default(now())
+
+  abonnement Abonnement?
+
+  utilisateurs Utilisateur[]
+  produits     Produit[]
+  fournisseurs Fournisseur[]
+  ventes       Vente[]
+}
+
+model Utilisateur {
+  id String @id @default(uuid())
+
+  nom        String
+  email      String
+  motDePasse String
+
+  role   Role     @default(VENDEUR)
+  creeLe DateTime @default(now())
+
+  compteId String
+  compte   Compte @relation(fields: [compteId], references: [id])
+
+  // 🔥 RELATIONS NOMMÉES
+  ventes Vente[]           @relation("UtilisateurVentes")
+  logs   JournalActivite[] @relation("UtilisateurLogs")
+}
+
+model Produit {
+  id String @id @default(uuid())
+
+  compteId String
+  compte   Compte @relation(fields: [compteId], references: [id])
+
+  nom         String
+  marque      String
+  prix        Float
+  seuilAlerte Int
+  creeLe      DateTime @default(now())
+
+  entreesStock EntreeStock[]
+  sortiesStock SortieStock[]
+  lignesVente  LigneVente[]
+  alertes      AlerteStock[]
+}
+
+model Fournisseur {
+  id String @id @default(uuid())
+
+  compteId String
+  compte   Compte @relation(fields: [compteId], references: [id])
+
+  nom       String
+  telephone String?
+  adresse   String?
+  creeLe    DateTime @default(now())
+
+  entreesStock EntreeStock[]
+}
+
+model EntreeStock {
+  id            String @id @default(uuid())
+  produitId     String
+  fournisseurId String
+
+  quantite  Int
+  prixAchat Float
+  creeLe    DateTime @default(now())
+
+  produit     Produit     @relation(fields: [produitId], references: [id])
+  fournisseur Fournisseur @relation(fields: [fournisseurId], references: [id])
+}
+
+model Vente {
+  id String @id @default(uuid())
+
+  compteId String
+  compte   Compte @relation(fields: [compteId], references: [id])
+
+  utilisateurId String
+  utilisateur   Utilisateur @relation("UtilisateurVentes", fields: [utilisateurId], references: [id])
+
+  montantTotal Float
+  creeLe       DateTime @default(now())
+
+  lignes    LigneVente[]
+  paiements Paiement[]
+}
+
+model LigneVente {
+  id        String @id @default(uuid())
+  venteId   String
+  produitId String
+  quantite  Int
+  prix      Float
+
+  vente   Vente   @relation(fields: [venteId], references: [id], onDelete: Cascade)
+  produit Produit @relation(fields: [produitId], references: [id], onDelete: Cascade)
+}
+
+model Paiement {
+  id      String @id @default(uuid())
+  venteId String
+
+  montant         Float
+  methodePaiement MethodePaiement
+
+  creeLe DateTime @default(now())
+
+  vente Vente @relation(fields: [venteId], references: [id])
+}
+
+model SortieStock {
+  id        String   @id @default(uuid())
+  produitId String
+  quantite  Int
+  raison    String
+  creeLe    DateTime @default(now())
+
+  produit Produit @relation(fields: [produitId], references: [id], onDelete: Cascade)
+}
+
+model AlerteStock {
+  id        String  @id @default(uuid())
+  produitId String  @unique
+  produit   Produit @relation(fields: [produitId], references: [id], onDelete: Cascade)
+
+  quantiteActuelle Int
+  niveauAlerte     Int
+  creeLe           DateTime @default(now())
+}
+
+model JournalActivite {
+  id String @id @default(uuid())
+
+  utilisateurId String
+  utilisateur   Utilisateur @relation("UtilisateurLogs", fields: [utilisateurId], references: [id])
+
+  action      String
+  description String
+  creeLe      DateTime @default(now())
+}
+
+model Abonnement {
+  id       String @id @default(uuid())
+  compteId String @unique
+  compte   Compte @relation(fields: [compteId], references: [id], onDelete: Cascade)
+
+  statut StatutAbonnement @default(INACTIF)
+  debut  DateTime?
+  fin    DateTime?
+  creeLe DateTime @default(now())
+}
