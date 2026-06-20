@@ -16,18 +16,22 @@ export class FournisseurService {
   async create(dto: CreateFournisseurDto, compteId: string) {
     const { nom, telephone, adresse } = dto;
 
+    const compteExiste = await this.prismaService.compte.findUnique({
+      where: { id: compteId },
+    });
+
+    if (!compteExiste) {
+      throw new BadRequestException('Compte introuvable, veuillez vous reconnecter');
+    }
+
     try {
       return await this.prismaService.fournisseur.create({
         data: {
           nom,
           telephone: telephone ?? null,
           adresse: adresse ?? null,
-
-          // 🔥 SAAS RELATION
           compte: {
-            connect: {
-              id: compteId,
-            },
+            connect: { id: compteId },
           },
         },
       });
