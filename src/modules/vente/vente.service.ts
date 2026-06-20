@@ -127,6 +127,8 @@ export class VenteService {
       }
 
       return vente;
+    }, {
+      timeout: 15000, // 🔥 15 secondes au lieu de 5 par défaut (évite P2028 sur bases distantes)
     });
   }
 
