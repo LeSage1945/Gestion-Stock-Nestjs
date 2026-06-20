@@ -92,16 +92,15 @@ model Fournisseur {
 }
 
 model EntreeStock {
-  id            String @id @default(uuid())
+  id            String   @id @default(uuid())
   produitId     String
-  fournisseurId String
+  fournisseurId String?
+  quantite      Int
+  prixAchat     Float
+  creeLe        DateTime @default(now())
 
-  quantite  Int
-  prixAchat Float
-  creeLe    DateTime @default(now())
-
-  produit     Produit     @relation(fields: [produitId], references: [id])
-  fournisseur Fournisseur @relation(fields: [fournisseurId], references: [id])
+  produit       Produit      @relation(fields: [produitId], references: [id])
+  fournisseur   Fournisseur? @relation(fields: [fournisseurId], references: [id])
 }
 
 model Vente {

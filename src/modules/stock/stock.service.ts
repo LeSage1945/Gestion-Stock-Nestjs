@@ -18,16 +18,16 @@ export class StockService {
     dto: CreateEntreeStockDto,
     compteId: string,
   ) {
-    const { produitId, fournisseurId, quantite, prixAchat } = dto;
+    const { produitId, quantite, prixAchat } = dto;
 
-    console.log('DTO reçu pour entrée stock :', dto);
-    console.log('compteId admin connecté :', compteId);
+    // Si fournisseurId est une chaîne vide ou absent, on le transforme en undefined
+    const fournisseurId = dto.fournisseurId && dto.fournisseurId.trim() !== ''
+      ? dto.fournisseurId
+      : undefined;
 
     const produit = await this.prismaService.produit.findFirst({
       where: { id: produitId, compteId },
     });
-
-    console.log('Produit trouvé :', produit);
 
     if (!produit) {
       throw new BadRequestException('Produit introuvable');
