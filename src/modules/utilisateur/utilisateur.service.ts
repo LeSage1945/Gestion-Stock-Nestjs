@@ -145,18 +145,86 @@ export class UtilisateurService {
   // ======================
   // DELETE USER
   // ======================
-  async remove(id: string, compteId: string) {
+  // async remove(id: string, compteId: string) {
+  //   const utilisateur = await this.prismaService.utilisateur.findFirst({
+  //     where: {
+  //       id,
+  //       compteId,
+  //     },
+  //   });
+
+  //   if (!utilisateur) {
+  //     throw new BadRequestException('Utilisateur non trouvé');
+  //   }
+
+  //   await this.prismaService.paiement.deleteMany({
+  //     where: {
+  //       vente: {
+  //         utilisateurId: id,
+  //       },
+  //     },
+  //   });
+
+  //   await this.prismaService.ligneVente.deleteMany({
+  //     where: {
+  //       vente: {
+  //         utilisateurId: id,
+  //       },
+  //     },
+  //   });
+
+  //   await this.prismaService.vente.deleteMany({
+  //     where: {
+  //       utilisateurId: id,
+  //     },
+  //   });
+
+  //   await this.prismaService.utilisateur.delete({
+  //     where: { id },
+  //   });
+
+  //   return {
+  //     message: 'Utilisateur supprimé avec succès',
+  //   };
+  // }
+
+  async remove(id: string, compteId: string, roleConnecte: string) {
+    // ==========================================
+    // LOGS DE DIAGNOSTIC (À regarder dans le terminal)
+    // ==========================================
+    console.log('--- DEBUT TENTATIVE DE SUPPRESSION ---');
+    console.log('ID reçu depuis Angular :', id);
+    console.log('Compte ID de l\'admin connecté :', compteId);
+    console.log('Rôle de l\'admin connecté :', roleConnecte);
+
+    // 1. On vérifie d'abord si l'utilisateur existe, peu importe son entreprise
+    const userExisteRecuperation = await this.prismaService.utilisateur.findUnique({
+      where: { id },
+    });
+    console.log('Utilisateur trouvé en BDD uniquement par ID :', userExisteRecuperation);
+    // ==========================================
+
+    // 2. Préparation dynamique de la condition de recherche
+    const conditionWhere: any = { id };
+
+    // Si l'utilisateur connecté N'EST PAS le super admin, on bloque la recherche à son compte uniquement (Sécurité SaaS)
+    if (roleConnecte !== 'SUPER_ADMIN_SAGE_066062594') {
+      conditionWhere.compteId = compteId;
+      console.log(`Sécurité SaaS activée : Recherche limitée au compte ${compteId}`);
+    } else {
+      console.log('Mode SUPER_ADMIN détecté : Recherche globale sans restriction de compte.');
+    }
+
+    // Recherche de l'utilisateur avec la condition filtrée ou non
     const utilisateur = await this.prismaService.utilisateur.findFirst({
-      where: {
-        id,
-        compteId,
-      },
+      where: conditionWhere,
     });
 
     if (!utilisateur) {
-      throw new BadRequestException('Utilisateur non trouvé');
+      throw new BadRequestException('Utilisateur non trouvé ou droits insuffisants');
     }
 
+    // 3. Suppression en cascade des dépendances (Paiements via Ventes)
     await this.prismaService.paiement.deleteMany({
       where: {
         vente: {
@@ -165,6 +233,7 @@ export class UtilisateurService {
       },
     });
 
+    // 4. Suppression des lignes de vente liées aux ventes de cet utilisateur
     await this.prismaService.ligneVente.deleteMany({
       where: {
         vente: {
@@ -173,15 +242,20 @@ export class UtilisateurService {
       },
     });
 
+    // 5. Suppression de toutes les ventes enregistrées par cet utilisateur
     await this.prismaService.vente.deleteMany({
       where: {
         utilisateurId: id,
       },
     });
 
+    // 6. Enfin, suppression définitive de l'utilisateur
     await this.prismaService.utilisateur.delete({
       where: { id },
     });
+
+    console.log(`L'utilisateur ${id} a été supprimé avec succès.`);
+    console.log('--- FIN DE LA SUPPRESSION ---');
 
     return {
       message: 'Utilisateur supprimé avec succès',

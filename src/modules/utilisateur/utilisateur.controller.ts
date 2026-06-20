@@ -89,8 +89,21 @@ export class UtilisateurController {
   // ======================
   // DELETE USER
   // ======================
+  // @Delete('delete/user/:id')
+  // remove(@Param('id') id: string, @Req() req: any) {
+  //   console.log(id)
+  //   return this.utilisateurService.remove(id, req.user.compteId);
+  // }
+
+  // ======================
+  // DELETE USER
+  // ======================
   @Delete('delete/user/:id')
   remove(@Param('id') id: string, @Req() req: any) {
-    return this.utilisateurService.remove(id, req.user.compteId);
+    console.log('ID à supprimer reçu dans le contrôleur :', id);
+    console.log('Utilisateur connecté effectuant l\'action :', req.user);
+    
+    // On passe l'id cible, le compteId de l'admin ET son rôle
+    return this.utilisateurService.remove(id, req.user.compteId, req.user.role);
   }
 }
