@@ -24,6 +24,7 @@ export class StockController {
   // ======================
   @Post('entree')
   addEntree(@Body() dto: CreateEntreeStockDto, @Req() req: any) {
+    console.log("entre")
     return this.stockService.addEntree(dto, req.user.compteId);
   }
 

@@ -20,9 +20,14 @@ export class StockService {
   ) {
     const { produitId, fournisseurId, quantite, prixAchat } = dto;
 
+    console.log('DTO reçu pour entrée stock :', dto);
+    console.log('compteId admin connecté :', compteId);
+
     const produit = await this.prismaService.produit.findFirst({
       where: { id: produitId, compteId },
     });
+
+    console.log('Produit trouvé :', produit);
 
     if (!produit) {
       throw new BadRequestException('Produit introuvable');
@@ -42,6 +47,7 @@ export class StockService {
 
       return entree;
     } catch (error) {
+      console.error('ERREUR REELLE AJOUT STOCK :', error);
       throw new InternalServerErrorException(
         "Erreur lors de l'ajout du stock",
       );
