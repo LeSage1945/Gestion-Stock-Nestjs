@@ -1,10 +1,12 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateEntreeStockDto {
 
   @IsUUID('4', { message: 'Produit invalide (UUID requis)' })
   produitId!: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsOptional()
   @IsUUID('4', { message: 'Fournisseur invalide (UUID requis)' })
   fournisseurId?: string;
