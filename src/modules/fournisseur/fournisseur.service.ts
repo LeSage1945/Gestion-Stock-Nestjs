@@ -16,9 +16,14 @@ export class FournisseurService {
   async create(dto: CreateFournisseurDto, compteId: string) {
     const { nom, telephone, adresse } = dto;
 
+    console.log('compteId reçu (JSON) :', JSON.stringify(compteId));
+    console.log('longueur du compteId :', compteId?.length);
+
     const compteExiste = await this.prismaService.compte.findUnique({
       where: { id: compteId },
     });
+
+    console.log('Résultat recherche compte :', compteExiste);
 
     if (!compteExiste) {
       throw new BadRequestException('Compte introuvable, veuillez vous reconnecter');
