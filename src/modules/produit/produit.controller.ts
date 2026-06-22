@@ -25,6 +25,7 @@ export class ProduitController {
   // ======================
   @Post('create')
   create(@Body() dto: CreateProduitDto, @Req() req: any) {
+    console.log("dto")
     return this.produitService.createProduit(dto, req.user.compteId);
   }
 

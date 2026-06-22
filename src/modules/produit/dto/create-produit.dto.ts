@@ -1,9 +1,11 @@
 import { Transform, Type } from "class-transformer"
-import { IsNotEmpty, IsNumber, IsPositive, IsString, IsUUID, Max, MaxLength, Min } from "class-validator"
+import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID, MaxLength, Min } from "class-validator"
 
 export class CreateProduitDto {
+
+    @IsOptional()  // ← ajouté
     @IsUUID()
-    id!: string
+    id?: string    // ← optionnel
 
     @IsNotEmpty({ message: 'Le nom est obligatoire' })
     @IsString({ message: 'Le nom doit être une chaîne de caractères' })
@@ -26,5 +28,4 @@ export class CreateProduitDto {
     @IsNumber({}, { message: 'Le seuil doit être un nombre' })
     @Min(0, { message: 'Le seuil ne peut pas être négatif' })
     seuilAlerte!: number;
-
 }

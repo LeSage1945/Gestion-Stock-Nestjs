@@ -31,6 +31,6 @@ export class CreateUtilisateurDto {
     @IsEnum(Role, { message: 'Rôle invalide' })
     role?: Role;
 
-    compteId!: string; // 🔥 obligatoire ici
+    // compteId!: string; // 🔥 obligatoire ici
 
 }

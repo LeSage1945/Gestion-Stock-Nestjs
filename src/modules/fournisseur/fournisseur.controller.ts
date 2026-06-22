@@ -10,10 +10,8 @@ export class FournisseurController {
   constructor(private readonly fournisseurService: FournisseurService) { }
 
   @Post('create')
-  @Post('create')
   create(@Body() dto: CreateFournisseurDto, @Req() req: any) {
-    const compteId = req.user.sub; // 🔥 récupéré du token
-
+    const compteId = req.user.compteId; // ✅ au lieu de req.user.sub
     return this.fournisseurService.create(dto, compteId);
   }
 
