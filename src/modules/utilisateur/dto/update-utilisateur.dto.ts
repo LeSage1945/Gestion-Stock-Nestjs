@@ -1,10 +1,9 @@
 import { Role } from "@prisma/client";
-import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from "class-validator";
+import { IsEmail, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from "class-validator";
 
 export class UpdateUtilisateurDto {
 
-  @IsUUID('4', { message: "L'identifiant doit être un UUID valide" })
-  id!: string;
+  // ❌ supprimé : id vient de l'URL (:id), pas du body
 
   @IsOptional()
   @MaxLength(50, { message: 'Le nom ne doit pas dépasser 50 caractères' })

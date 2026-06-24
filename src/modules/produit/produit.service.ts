@@ -115,14 +115,32 @@ export class ProduitService {
   // ======================
   async remove(id: string, compteId: string) {
     const produit = await this.prismaService.produit.findFirst({
-      where: {
-        id,
-        compteId, // 🔥 sécurité SaaS
-      },
+      where: { id, compteId },
+      include: {
+        _count: {
+          select: {
+            lignesVente: true,
+            entreesStock: true,
+            sortiesStock: true,
+          }
+        }
+      }
     });
 
     if (!produit) {
       throw new BadRequestException('Produit non trouvé');
+    }
+
+    if (produit._count.lignesVente > 0) {
+      throw new BadRequestException(
+        `Impossible de supprimer "${produit.nom}" : ce produit est lié à ${produit._count.lignesVente} vente(s)`
+      );
+    }
+
+    if (produit._count.entreesStock > 0 || produit._count.sortiesStock > 0) {
+      throw new BadRequestException(
+        `Impossible de supprimer "${produit.nom}" : ce produit a un historique de stock`
+      );
     }
 
     try {
@@ -130,12 +148,14 @@ export class ProduitService {
         where: { id },
       });
 
-      return { message: 'Produit supprimé avec succès' };
-    } catch (error: any) {
-      if (error.code === 'P2025') {
-        throw new BadRequestException('Produit non trouvé');
-      }
+      return { message: `Produit "${produit.nom}" supprimé avec succès` };
 
+    } catch (error: any) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          `Impossible de supprimer "${produit.nom}" : il est utilisé dans d'autres données`
+        );
+      }
       throw new InternalServerErrorException('Erreur serveur');
     }
   }
