@@ -74,6 +74,21 @@ export class UtilisateurService {
   // ======================
   // GET ALL ADMINS (GLOBAL - toutes boutiques)
   // ======================
+  // async findAllAdminsGlobal() {
+  //   return this.prismaService.utilisateur.findMany({
+  //     where: {
+  //       role: Role.ADMIN,
+  //     },
+  //     select: {
+  //       id: true,
+  //       nom: true,
+  //       email: true,
+  //       role: true,
+  //       creeLe: true,
+  //       compteId: true, // important pour voir la boutique
+  //     },
+  //   });
+  // }
   async findAllAdminsGlobal() {
     return this.prismaService.utilisateur.findMany({
       where: {
@@ -85,7 +100,13 @@ export class UtilisateurService {
         email: true,
         role: true,
         creeLe: true,
-        compteId: true, // important pour voir la boutique
+        compteId: true,
+        compte: {         // ← inclure la relation
+          select: {
+            nom: true,
+            code: true,
+          }
+        }
       },
     });
   }

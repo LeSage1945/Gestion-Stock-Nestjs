@@ -126,7 +126,7 @@ export class StockService {
     // });
 
     const stockActuel = (entrees._sum.quantite || 0) - (sorties._sum.quantite || 0);
-      // (ventes._sum.quantite || 0);
+    // (ventes._sum.quantite || 0);
 
     return {
       produitId,
@@ -298,22 +298,37 @@ export class StockService {
       include: {
         entreesStock: true,
         sortiesStock: true,
+        lignesVente: true, // ← pour calculer le réalisé
       },
-      // ❌ lignesVente retiré — déjà compté dans sortiesStock
     });
 
     return produits.map((p) => {
       const totalEntrees = p.entreesStock.reduce((sum, e) => sum + e.quantite, 0);
       const totalSorties = p.sortiesStock.reduce((sum, s) => sum + s.quantite, 0);
 
+      // Total attendu = tout le stock entré × prix de vente
+      const totalAttendu = totalEntrees * p.prix;
+
+      // Réalisé = ce qui a été vendu × prix de vente
+      const totalRealise = p.lignesVente.reduce(
+        (sum, v) => sum + v.quantite * v.prix, 0
+      );
+
+      // Manque à gagner
+      const manqueAGagner = totalAttendu - totalRealise;
+
       return {
         produitId: p.id,
         nom: p.nom,
         marque: p.marque,
+        prix: p.prix,
         seuilAlerte: p.seuilAlerte,
         entrees: totalEntrees,
         sorties: totalSorties,
         stockActuel: totalEntrees - totalSorties,
+        totalAttendu,
+        totalRealise,
+        manqueAGagner,
       };
     });
   }
