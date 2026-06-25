@@ -43,7 +43,8 @@ export class StockService {
         },
       });
 
-      await this.generateAlertes(compteId);
+      // 🔥 CORRECTION : Alerte ciblée sur le produit modifié
+      await this.generateAlertePourProduit(produitId, compteId);
 
       return entree;
     } catch (error) {
@@ -86,7 +87,8 @@ export class StockService {
         },
       });
 
-      await this.generateAlertes(compteId);
+      // 🔥 CORRECTION : Alerte ciblée sur le produit modifié
+      await this.generateAlertePourProduit(produitId, compteId);
 
       return sortie;
     } catch (error) {
@@ -118,15 +120,13 @@ export class StockService {
       _sum: { quantite: true },
     });
 
-    const ventes = await this.prismaService.ligneVente.aggregate({
-      where: { produitId },
-      _sum: { quantite: true },
-    });
+    // const ventes = await this.prismaService.ligneVente.aggregate({
+    //   where: { produitId },
+    //   _sum: { quantite: true },
+    // });
 
-    const stockActuel =
-      (entrees._sum.quantite || 0) -
-      (sorties._sum.quantite || 0) -
-      (ventes._sum.quantite || 0);
+    const stockActuel = (entrees._sum.quantite || 0) - (sorties._sum.quantite || 0);
+      // (ventes._sum.quantite || 0);
 
     return {
       produitId,
@@ -137,29 +137,29 @@ export class StockService {
   }
 
   // ======================
-  // ALERTES STOCK (SAAS)
+  // ALERTES STOCK OPTIMISÉE (SAAS)
   // ======================
-  async generateAlertes(compteId: string) {
-    const produits = await this.prismaService.produit.findMany({
-      where: { compteId }, // 🔥 IMPORTANT SAAS
+  async generateAlertePourProduit(produitId: string, compteId: string) {
+    const stock = await this.getStockByProduit(produitId, compteId);
+
+    const produit = await this.prismaService.produit.findFirst({
+      where: { id: produitId, compteId }
     });
 
-    for (const p of produits) {
-      const stock = await this.getStockByProduit(p.id, compteId);
+    if (!produit) return;
 
-      await this.prismaService.alerteStock.upsert({
-        where: { produitId: p.id },
-        update: {
-          quantiteActuelle: stock.stockActuel,
-          niveauAlerte: p.seuilAlerte,
-        },
-        create: {
-          produitId: p.id,
-          quantiteActuelle: stock.stockActuel,
-          niveauAlerte: p.seuilAlerte,
-        },
-      });
-    }
+    await this.prismaService.alerteStock.upsert({
+      where: { produitId: produitId },
+      update: {
+        quantiteActuelle: stock.stockActuel,
+        niveauAlerte: produit.seuilAlerte,
+      },
+      create: {
+        produitId: produitId,
+        quantiteActuelle: stock.stockActuel,
+        niveauAlerte: produit.seuilAlerte,
+      },
+    });
   }
 
   // ======================
@@ -209,11 +209,14 @@ export class StockService {
       throw new BadRequestException('Entrée introuvable');
     }
 
+    const produitId = entree.produitId;
+
     await this.prismaService.entreeStock.delete({
       where: { id },
     });
 
-    await this.generateAlertes(compteId);
+    // 🔥 CORRECTION : Alerte ciblée après suppression
+    await this.generateAlertePourProduit(produitId, compteId);
 
     return { message: 'Entrée supprimée avec succès' };
   }
@@ -235,11 +238,14 @@ export class StockService {
       throw new BadRequestException('Sortie introuvable');
     }
 
+    const produitId = sortie.produitId;
+
     await this.prismaService.sortieStock.delete({
       where: { id },
     });
 
-    await this.generateAlertes(compteId);
+    // 🔥 CORRECTION : Alerte ciblée après suppression
+    await this.generateAlertePourProduit(produitId, compteId);
 
     return { message: 'Sortie supprimée avec succès' };
   }
@@ -247,31 +253,58 @@ export class StockService {
   // ======================
   // ALL STOCKS (SAAS)
   // ======================
+  // async getAllStocks(compteId: string) {
+  //   const produits = await this.prismaService.produit.findMany({
+  //     where: { compteId },
+  //     include: {
+  //       entreesStock: true,
+  //       sortiesStock: true,
+  //       lignesVente: true,
+  //     },
+  //   });
+
+  //   return produits.map((p) => {
+  //     const totalEntrees = p.entreesStock.reduce(
+  //       (sum, e) => sum + e.quantite,
+  //       0,
+  //     );
+
+  //     const totalSorties = p.sortiesStock.reduce(
+  //       (sum, s) => sum + s.quantite,
+  //       0,
+  //     );
+
+  //     // const totalVentes = p.lignesVente.reduce(
+  //     //   (sum, v) => sum + v.quantite,
+  //     //   0,
+  //     // );
+
+  //     return {
+  //       produitId: p.id,
+  //       nom: p.nom,
+  //       marque: p.marque,
+  //       seuilAlerte: p.seuilAlerte,
+  //       entrees: totalEntrees,
+  //       sorties: totalSorties,
+  //       ventes: totalVentes,
+  //       stockActuel: totalEntrees - totalSorties - totalVentes,
+  //     };
+  //   });
+  // }
+
   async getAllStocks(compteId: string) {
     const produits = await this.prismaService.produit.findMany({
       where: { compteId },
       include: {
         entreesStock: true,
         sortiesStock: true,
-        lignesVente: true,
       },
+      // ❌ lignesVente retiré — déjà compté dans sortiesStock
     });
 
     return produits.map((p) => {
-      const totalEntrees = p.entreesStock.reduce(
-        (sum, e) => sum + e.quantite,
-        0,
-      );
-
-      const totalSorties = p.sortiesStock.reduce(
-        (sum, s) => sum + s.quantite,
-        0,
-      );
-
-      const totalVentes = p.lignesVente.reduce(
-        (sum, v) => sum + v.quantite,
-        0,
-      );
+      const totalEntrees = p.entreesStock.reduce((sum, e) => sum + e.quantite, 0);
+      const totalSorties = p.sortiesStock.reduce((sum, s) => sum + s.quantite, 0);
 
       return {
         produitId: p.id,
@@ -280,8 +313,7 @@ export class StockService {
         seuilAlerte: p.seuilAlerte,
         entrees: totalEntrees,
         sorties: totalSorties,
-        ventes: totalVentes,
-        stockActuel: totalEntrees - totalSorties - totalVentes,
+        stockActuel: totalEntrees - totalSorties,
       };
     });
   }

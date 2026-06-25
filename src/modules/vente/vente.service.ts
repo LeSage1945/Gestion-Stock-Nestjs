@@ -47,11 +47,49 @@ export class VenteService {
 
     return this.prisma.$transaction(async (tx) => {
       // ================= STOCK CHECK SAAS =================
+      // for (const l of lignes) {
+      //   const produit = await tx.produit.findFirst({
+      //     where: {
+      //       id: l.produitId,
+      //       compteId, // 🔥 SAAS SECURITY
+      //     },
+      //   });
+
+      //   if (!produit) {
+      //     throw new BadRequestException('Produit introuvable');
+      //   }
+
+      //   const entrees = await tx.entreeStock.aggregate({
+      //     where: { produitId: l.produitId },
+      //     _sum: { quantite: true },
+      //   });
+
+      //   const sorties = await tx.sortieStock.aggregate({
+      //     where: { produitId: l.produitId },
+      //     _sum: { quantite: true },
+      //   });
+
+      //   const ventes = await tx.ligneVente.aggregate({
+      //     where: { produitId: l.produitId },
+      //     _sum: { quantite: true },
+      //   });
+
+      //   const stock =
+      //     (entrees._sum.quantite || 0) -
+      //     (sorties._sum.quantite || 0) -
+      //     (ventes._sum.quantite || 0);
+
+      //   if (stock < l.quantite) {
+      //     throw new BadRequestException(
+      //       `Stock insuffisant pour ${produit.nom}`,
+      //     );
+      //   }
+      // }
       for (const l of lignes) {
         const produit = await tx.produit.findFirst({
           where: {
             id: l.produitId,
-            compteId, // 🔥 SAAS SECURITY
+            compteId,
           },
         });
 
@@ -69,15 +107,9 @@ export class VenteService {
           _sum: { quantite: true },
         });
 
-        const ventes = await tx.ligneVente.aggregate({
-          where: { produitId: l.produitId },
-          _sum: { quantite: true },
-        });
-
         const stock =
           (entrees._sum.quantite || 0) -
-          (sorties._sum.quantite || 0) -
-          (ventes._sum.quantite || 0);
+          (sorties._sum.quantite || 0);
 
         if (stock < l.quantite) {
           throw new BadRequestException(
