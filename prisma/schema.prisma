@@ -27,6 +27,31 @@ enum StatutAbonnement {
   BLOQUE
 }
 
+enum TypeMouvement {
+  ENTREE
+  SORTIE
+}
+
+enum SourceMouvement {
+  VENTE
+  ACHAT_STOCK
+  MANUEL
+}
+
+// model Compte {
+//   id     String   @id @default(uuid())
+//   code   String   @unique
+//   nom    String
+//   creeLe DateTime @default(now())
+
+//   abonnement Abonnement?
+
+//   utilisateurs Utilisateur[]
+//   produits     Produit[]
+//   fournisseurs Fournisseur[]
+//   ventes       Vente[]
+//   mouvementsCaisse MouvementCaisse[]
+// }
 model Compte {
   id     String   @id @default(uuid())
   code   String   @unique
@@ -35,10 +60,11 @@ model Compte {
 
   abonnement Abonnement?
 
-  utilisateurs Utilisateur[]
-  produits     Produit[]
-  fournisseurs Fournisseur[]
-  ventes       Vente[]
+  utilisateurs     Utilisateur[]
+  produits         Produit[]
+  fournisseurs     Fournisseur[]
+  ventes           Vente[]
+  mouvementsCaisse MouvementCaisse[] // ← ajoute cette ligne
 }
 
 model Utilisateur {
@@ -182,4 +208,20 @@ model Abonnement {
   debut  DateTime?
   fin    DateTime?
   creeLe DateTime @default(now())
+}
+
+model MouvementCaisse {
+  id       String @id @default(uuid())
+
+  compteId String
+  compte   Compte @relation(fields: [compteId], references: [id])
+
+  type    TypeMouvement
+  source  SourceMouvement
+  montant Float
+  motif   String
+  creeLe  DateTime @default(now())
+
+  venteId       String?
+  entreeStockId String?
 }

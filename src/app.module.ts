@@ -17,6 +17,7 @@ import { PaiementModule } from './modules/paiement/paiement.module';
 import { AbonnementModule } from './modules/abonnement/abonnement.module';
 import { AbonnementCheckMiddleware } from './middleware/abonnement-check/abonnement-check.middleware';
 import { CompteModule } from './modules/compte/compte.module';
+import { CaisseModule } from './modules/caisse/caisse.module';
 
 
 @Module({
@@ -38,6 +39,8 @@ import { CompteModule } from './modules/compte/compte.module';
     }),
 
     CompteModule,
+
+    CaisseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -18,4 +18,8 @@ export class CreateEntreeStockDto {
   @IsNumber({}, { message: 'Le prix d\'achat doit être un nombre' })
   @Min(0, { message: 'Le prix doit être positif' })
   prixAchat!: number;
+
+  @IsNumber({}, { message: 'Le montant total doit être un nombre' })
+  @Min(0, { message: 'Le montant total doit être positif' })
+  montantTotal!: number;
 }
