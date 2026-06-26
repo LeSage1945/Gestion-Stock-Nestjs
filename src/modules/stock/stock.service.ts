@@ -119,6 +119,36 @@ export class StockService {
   // ======================
   // STOCK PAR PRODUIT
   // ======================
+  // async getStockByProduit(produitId: string, compteId: string) {
+  //   const produit = await this.prismaService.produit.findFirst({
+  //     where: { id: produitId, compteId },
+  //   });
+
+  //   if (!produit) {
+  //     throw new BadRequestException('Produit introuvable');
+  //   }
+
+  //   const entrees = await this.prismaService.entreeStock.aggregate({
+  //     where: { produitId },
+  //     _sum: { quantite: true },
+  //   });
+
+  //   const sorties = await this.prismaService.sortieStock.aggregate({
+  //     where: { produitId },
+  //     _sum: { quantite: true },
+  //   });
+
+  //   const stockActuel =
+  //     (entrees._sum.quantite || 0) -
+  //     (sorties._sum.quantite || 0);
+
+  //   return {
+  //     produitId,
+  //     stockActuel,
+  //     entrees: entrees._sum.quantite || 0,
+  //     sorties: sorties._sum.quantite || 0,
+  //   };
+  // }
   async getStockByProduit(produitId: string, compteId: string) {
     const produit = await this.prismaService.produit.findFirst({
       where: { id: produitId, compteId },
@@ -128,25 +158,42 @@ export class StockService {
       throw new BadRequestException('Produit introuvable');
     }
 
+    // ✔️ Entrées filtrées par produit + compte
     const entrees = await this.prismaService.entreeStock.aggregate({
-      where: { produitId },
-      _sum: { quantite: true },
+      where: {
+        produitId,
+        produit: {
+          compteId,
+        },
+      },
+      _sum: {
+        quantite: true,
+      },
     });
 
+    // ✔️ Sorties filtrées par produit + compte
     const sorties = await this.prismaService.sortieStock.aggregate({
-      where: { produitId },
-      _sum: { quantite: true },
+      where: {
+        produitId,
+        produit: {
+          compteId,
+        },
+      },
+      _sum: {
+        quantite: true,
+      },
     });
 
-    const stockActuel =
-      (entrees._sum.quantite || 0) -
-      (sorties._sum.quantite || 0);
+    const totalEntrees = entrees._sum.quantite || 0;
+    const totalSorties = sorties._sum.quantite || 0;
+
+    const stockActuel = totalEntrees - totalSorties;
 
     return {
       produitId,
       stockActuel,
-      entrees: entrees._sum.quantite || 0,
-      sorties: sorties._sum.quantite || 0,
+      entrees: totalEntrees,
+      sorties: totalSorties,
     };
   }
 
