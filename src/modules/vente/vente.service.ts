@@ -100,6 +100,7 @@ export class VenteService {
             produitId: l.produitId,
             quantite: l.quantite,
             raison: 'VENTE',
+            venteId: vente.id,
           },
         });
       }

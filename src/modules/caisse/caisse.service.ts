@@ -1,31 +1,49 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { StockService } from '../stock/stock.service';
 
 @Injectable()
 export class CaisseService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => StockService))
+    private stockService: StockService,
+  ) { }
 
   // ================= SOLDE =================
-  // async getSolde(compteId: string) {
-  //   const entrees = await this.prisma.mouvementCaisse.aggregate({
-  //     where: { compteId, type: 'ENTREE' },
-  //     _sum: { montant: true },
-  //   });
+  async getSolde(compteId: string): Promise<{ solde: number; totalEntrees: number; totalSorties: number }> {
+    const entrees = await this.prisma.mouvementCaisse.aggregate({
+      where: { compteId, type: 'ENTREE' },
+      _sum: { montant: true },
+    });
 
-  //   const sorties = await this.prisma.mouvementCaisse.aggregate({
-  //     where: { compteId, type: 'SORTIE' },
-  //     _sum: { montant: true },
-  //   });
+    const sorties = await this.prisma.mouvementCaisse.aggregate({
+      where: { compteId, type: 'SORTIE' },
+      _sum: { montant: true },
+    });
 
-  //   const totalEntrees = entrees._sum.montant || 0;
-  //   const totalSorties = sorties._sum.montant || 0;
+    const totalEntrees = entrees._sum.montant || 0;
+    const totalSorties = sorties._sum.montant || 0;
 
-  //   return {
-  //     solde: totalEntrees - totalSorties,
-  //     totalEntrees,
-  //     totalSorties,
-  //   };
-  // }
+    return {
+      solde: totalEntrees - totalSorties,
+      totalEntrees,
+      totalSorties,
+    };
+  }
+
+  // ================= CAPITAL INITIAL =================
+  async hasCapitalInitial(compteId: string): Promise<boolean> {
+    const capital = await this.prisma.mouvementCaisse.findFirst({
+      where: {
+        compteId,
+        type: 'ENTREE',
+        source: 'MANUEL',
+        motif: { contains: 'Capital initial' },
+      },
+    });
+    return !!capital;
+  }
 
   // ================= GET ALL =================
   async getAll(compteId: string) {
@@ -41,23 +59,16 @@ export class CaisseService {
     montant: number;
     motif: string;
   }) {
-    if (dto.montant <= 0) {
+    if (dto.montant <= 0)
       throw new BadRequestException('Le montant doit être positif');
-    }
 
-    if (!dto.motif?.trim()) {
+    if (!dto.motif?.trim())
       throw new BadRequestException('Le motif est obligatoire');
-    }
 
-    // Vérifier solde suffisant pour une sortie
     if (dto.type === 'SORTIE') {
-      // const { solde } = await this.getSolde(compteId);
-      const solde = await this.getSolde(compteId);
-      if (solde < dto.montant) {
-        throw new BadRequestException(
-          `Solde insuffisant. Solde actuel : ${solde} FCFA`
-        );
-      }
+      const { solde } = await this.getSolde(compteId);
+      if (solde < dto.montant)
+        throw new BadRequestException(`Solde insuffisant. Solde actuel : ${solde.toLocaleString('fr-FR')} FCFA`);
     }
 
     return this.prisma.mouvementCaisse.create({
@@ -69,6 +80,92 @@ export class CaisseService {
         motif: dto.motif,
       },
     });
+  }
+
+  // ================= UPDATE MOUVEMENT =================
+  async update(id: string, compteId: string, dto: {
+    montant?: number;
+    motif?: string;
+  }) {
+    const mouvement = await this.prisma.mouvementCaisse.findFirst({
+      where: { id, compteId },
+    });
+
+    if (!mouvement)
+      throw new BadRequestException('Mouvement introuvable');
+
+    if (dto.montant !== undefined && dto.montant <= 0)
+      throw new BadRequestException('Le montant doit être positif');
+
+    if (dto.motif !== undefined && !dto.motif.trim())
+      throw new BadRequestException('Le motif ne peut pas être vide');
+
+    if (dto.montant !== undefined && mouvement.type === 'SORTIE') {
+      const { solde: soldeActuel } = await this.getSolde(compteId);
+      const soldeCorrige = soldeActuel + mouvement.montant;
+      if (soldeCorrige < dto.montant)
+        throw new BadRequestException(
+          `Solde insuffisant pour cette correction. Disponible : ${soldeCorrige.toLocaleString('fr-FR')} FCFA`
+        );
+    }
+
+    return this.prisma.mouvementCaisse.update({
+      where: { id },
+      data: {
+        ...(dto.montant !== undefined && { montant: dto.montant }),
+        ...(dto.motif !== undefined && { motif: dto.motif }),
+      },
+    });
+  }
+
+  // ================= DELETE =================
+  async remove(id: string, compteId: string) {
+    const mouvement = await this.prisma.mouvementCaisse.findFirst({
+      where: { id, compteId },
+    });
+
+    if (!mouvement) throw new BadRequestException('Mouvement introuvable');
+
+    if (mouvement.source === 'ACHAT_STOCK' && mouvement.entreeStockId) {
+      const entree = await this.prisma.entreeStock.findFirst({
+        where: { id: mouvement.entreeStockId },
+      });
+
+      await this.prisma.mouvementCaisse.delete({ where: { id } });
+
+      await this.prisma.entreeStock.delete({
+        where: { id: mouvement.entreeStockId },
+      });
+
+      if (entree) {
+        await this.stockService.generateAlertePourProduit(entree.produitId, compteId);
+      }
+    }
+
+    if (mouvement.source === 'VENTE' && mouvement.venteId) {
+      const lignes = await this.prisma.ligneVente.findMany({
+        where: { venteId: mouvement.venteId },
+      });
+
+      await this.prisma.sortieStock.deleteMany({
+        where: { venteId: mouvement.venteId },
+      });
+
+      await this.prisma.ligneVente.deleteMany({ where: { venteId: mouvement.venteId } });
+      await this.prisma.paiement.deleteMany({ where: { venteId: mouvement.venteId } });
+      await this.prisma.mouvementCaisse.delete({ where: { id } });
+      await this.prisma.vente.delete({ where: { id: mouvement.venteId } });
+
+      for (const ligne of lignes) {
+        await this.stockService.generateAlertePourProduit(ligne.produitId, compteId);
+      }
+    }
+
+    if (mouvement.source === 'MANUEL') {
+      await this.prisma.mouvementCaisse.delete({ where: { id } });
+    }
+
+    return { message: 'Mouvement supprimé avec succès' };
   }
 
   // ================= ENTREE AUTO (VENTE) =================
@@ -97,53 +194,5 @@ export class CaisseService {
         entreeStockId,
       },
     });
-  }
-
-  // ================= DELETE =================
-  async remove(id: string, compteId: string) {
-    const mouvement = await this.prisma.mouvementCaisse.findFirst({
-      where: { id, compteId },
-    });
-
-    if (!mouvement) {
-      throw new BadRequestException('Mouvement introuvable');
-    }
-
-    if (mouvement.source !== 'MANUEL') {
-      throw new BadRequestException(
-        'Impossible de supprimer un mouvement automatique'
-      );
-    }
-
-    await this.prisma.mouvementCaisse.delete({ where: { id } });
-    return { message: 'Mouvement supprimé avec succès' };
-  }
-
-  // ================= SOLDE =================
-  async getSolde(compteId: string): Promise<number> {
-    const entrees = await this.prisma.mouvementCaisse.aggregate({
-      where: { compteId, type: 'ENTREE' },
-      _sum: { montant: true },
-    });
-
-    const sorties = await this.prisma.mouvementCaisse.aggregate({
-      where: { compteId, type: 'SORTIE' },
-      _sum: { montant: true },
-    });
-
-    return (entrees._sum.montant || 0) - (sorties._sum.montant || 0);
-  }
-
-  // ================= VÉRIFIER CAPITAL INITIAL =================
-  async hasCapitalInitial(compteId: string): Promise<boolean> {
-    const capital = await this.prisma.mouvementCaisse.findFirst({
-      where: {
-        compteId,
-        type: 'ENTREE',
-        source: 'MANUEL',
-        motif: { contains: 'Capital initial' },
-      },
-    });
-    return !!capital;
   }
 }

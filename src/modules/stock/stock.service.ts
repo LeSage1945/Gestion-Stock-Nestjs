@@ -46,9 +46,8 @@ export class StockService {
     }
 
     // ================= VÉRIF SOLDE SUFFISANT =================
-    // const montantAchat = quantite * prixAchat;
-    const montantAchat = montantTotal;
-    const solde = await this.caisseService.getSolde(compteId);
+    const montantAchat = montantTotal ?? (quantite * prixAchat);
+    const { solde } = await this.caisseService.getSolde(compteId); // ← déstructurer
 
     if (solde < montantAchat) {
       throw new BadRequestException(
