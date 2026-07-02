@@ -18,6 +18,9 @@ import { AbonnementModule } from './modules/abonnement/abonnement.module';
 import { AbonnementCheckMiddleware } from './middleware/abonnement-check/abonnement-check.middleware';
 import { CompteModule } from './modules/compte/compte.module';
 import { CaisseModule } from './modules/caisse/caisse.module';
+import { BoutiqueModule } from './modules/boutique/boutique.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { AdminMarketplaceModule } from './modules/admin-marketplac/admin-marketplac.module';
 
 
 @Module({
@@ -33,14 +36,12 @@ import { CaisseModule } from './modules/caisse/caisse.module';
     LigneVenteModule,
     PaiementModule,
     AbonnementModule,
-
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-
+    ConfigModule.forRoot({ isGlobal: true }),
     CompteModule,
-
     CaisseModule,
+    BoutiqueModule,
+    MarketplaceModule,
+    AdminMarketplaceModule
   ],
   controllers: [AppController],
   providers: [AppService],
