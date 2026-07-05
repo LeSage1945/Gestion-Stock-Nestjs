@@ -301,9 +301,19 @@ export class StockService {
     return produits.map((p) => {
       const totalEntrees = p.entreesStock.reduce((sum, e) => sum + e.quantite, 0);
       const totalSorties = p.sortiesStock.reduce((sum, s) => sum + s.quantite, 0);
-      const totalAttendu = totalEntrees * p.prix;
+      const stockActuel = totalEntrees - totalSorties;
+
+      // Chiffre RÉELLEMENT réalisé (ventes historiques, au prix de vente réel à l'époque)
       const totalRealise = p.lignesVente.reduce((sum, v) => sum + v.quantite * v.prix, 0);
-      const manqueAGagner = totalAttendu - totalRealise;
+
+      // Valeur du stock RESTANT (non vendu), au prix catalogue actuel
+      const valeurStockRestant = stockActuel * p.prix;
+
+      // Total attendu = ce qui a déjà été vendu + ce qu'il reste à vendre au prix actuel
+      const totalAttendu = totalRealise + valeurStockRestant;
+
+      // Manque à gagner = uniquement la valeur du stock non encore vendu
+      const manqueAGagner = valeurStockRestant;
 
       return {
         produitId: p.id,
@@ -313,7 +323,7 @@ export class StockService {
         seuilAlerte: p.seuilAlerte,
         entrees: totalEntrees,
         sorties: totalSorties,
-        stockActuel: totalEntrees - totalSorties,
+        stockActuel,
         totalAttendu,
         totalRealise,
         manqueAGagner,

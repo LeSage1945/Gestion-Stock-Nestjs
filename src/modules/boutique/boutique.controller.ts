@@ -22,25 +22,25 @@ export class BoutiqueController {
     return this.boutiqueService.createCommande(dto);
   }
 
-  @Get('commande/:id')
-  getCommande(@Param('id') id: string) {
-    return this.boutiqueService.getCommande(id);
-  }
-
-
-  @Put('commande/:id/statut')
-  updateStatutCommande(
-    @Param('id') id: string,
-    @Body('statutCommande') statutCommande: StatutCommande,
-  ) {
-    return this.boutiqueService.updateStatutCommande(id, statutCommande);
-  }
-
   @Get('commandes')
   getCommandes(
     @Query('compteId') compteId: string,
     @Query('statut') statut?: StatutCommande,
   ) {
     return this.boutiqueService.getCommandes(compteId, statut);
+  }
+
+  @Get('commande/:id')
+  getCommande(@Param('id') id: string) {
+    return this.boutiqueService.getCommande(id);
+  }
+
+  @Put('commande/:id/statut')
+  updateStatutCommande(
+    @Param('id') id: string,
+    @Body('statutCommande') statutCommande: StatutCommande,
+    @Body('utilisateurId') utilisateurId?: string,
+  ) {
+    return this.boutiqueService.updateStatutCommande(id, statutCommande, utilisateurId);
   }
 }
