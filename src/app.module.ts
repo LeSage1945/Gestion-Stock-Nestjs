@@ -21,6 +21,8 @@ import { CaisseModule } from './modules/caisse/caisse.module';
 import { BoutiqueModule } from './modules/boutique/boutique.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { AdminMarketplaceModule } from './modules/admin-marketplac/admin-marketplac.module';
+import { ClientsModule } from './modules/clients/clients.module';
+import { DettesModule } from './modules/dettes/dettes.module';
 
 
 @Module({
@@ -41,7 +43,9 @@ import { AdminMarketplaceModule } from './modules/admin-marketplac/admin-marketp
     CaisseModule,
     BoutiqueModule,
     MarketplaceModule,
-    AdminMarketplaceModule
+    AdminMarketplaceModule,
+    ClientsModule,
+    DettesModule
   ],
   controllers: [AppController],
   providers: [AppService],

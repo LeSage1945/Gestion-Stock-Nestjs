@@ -143,18 +143,51 @@ export class CaisseService {
     }
 
     if (mouvement.source === 'VENTE' && mouvement.venteId) {
+      const dette = await this.prisma.dette.findFirst({
+        where: { venteId: mouvement.venteId },
+        include: { client: true },
+      });
+
+      if (dette && dette.statut === 'EN_COURS') {
+        throw new BadRequestException(
+          `Impossible de supprimer cette vente : une dette de ${dette.montantRestant.toLocaleString('fr-FR')} FCFA ` +
+          `est encore en cours pour ${dette.client.nom}. ` +
+          `Pour corriger une erreur de saisie, allez sur la page Dettes et utilisez "Annuler la dette".`,
+        );
+      }
+
       const lignes = await this.prisma.ligneVente.findMany({
         where: { venteId: mouvement.venteId },
       });
 
-      await this.prisma.sortieStock.deleteMany({
-        where: { venteId: mouvement.venteId },
-      });
+      const operations: any[] = [];
 
-      await this.prisma.ligneVente.deleteMany({ where: { venteId: mouvement.venteId } });
-      await this.prisma.paiement.deleteMany({ where: { venteId: mouvement.venteId } });
-      await this.prisma.mouvementCaisse.delete({ where: { id } });
-      await this.prisma.vente.delete({ where: { id: mouvement.venteId } });
+      if (dette) {
+        operations.push(
+          this.prisma.remboursementDette.deleteMany({ where: { detteId: dette.id } }),
+        );
+        operations.push(
+          this.prisma.dette.delete({ where: { id: dette.id } }),
+        );
+      }
+
+      operations.push(
+        this.prisma.sortieStock.deleteMany({ where: { venteId: mouvement.venteId! } }),
+      );
+      operations.push(
+        this.prisma.ligneVente.deleteMany({ where: { venteId: mouvement.venteId! } }),
+      );
+      operations.push(
+        this.prisma.paiement.deleteMany({ where: { venteId: mouvement.venteId! } }),
+      );
+      operations.push(
+        this.prisma.mouvementCaisse.delete({ where: { id } }),
+      );
+      operations.push(
+        this.prisma.vente.delete({ where: { id: mouvement.venteId! } }),
+      );
+
+      await this.prisma.$transaction(operations);
 
       for (const ligne of lignes) {
         await this.stockService.generateAlertePourProduit(ligne.produitId, compteId);
@@ -163,6 +196,12 @@ export class CaisseService {
 
     if (mouvement.source === 'MANUEL') {
       await this.prisma.mouvementCaisse.delete({ where: { id } });
+    }
+
+    if (mouvement.source === 'DETTE') {
+      throw new BadRequestException(
+        'Ce mouvement correspond à un remboursement de dette et ne peut pas être supprimé directement.',
+      );
     }
 
     return { message: 'Mouvement supprimé avec succès' };

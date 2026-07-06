@@ -11,13 +11,13 @@ export class VenteService {
 
   // ================= CREATE =================
   async create(dto: any, compteId: string) {
-    const { lignes, paiements, utilisateurId, montantTotal } = dto;
+    const { lignes, paiements, utilisateurId, montantTotal, clientId } = dto;
 
     if (!lignes?.length) {
       throw new BadRequestException('Aucun produit dans la vente');
     }
 
-    // ================= VALIDATION TOTAL =================
+    // ================= VALIDATION TOTAL LIGNES =================
     let total = 0;
 
     for (const l of lignes) {
@@ -34,12 +34,54 @@ export class VenteService {
       throw new BadRequestException('Montant incorrect');
     }
 
+    // ================= VALIDATION PAIEMENTS (paiement partiel autorisé) =================
     const totalPaiements = paiements.reduce(
       (sum, p) => sum + p.montant, 0
     );
 
-    if (totalPaiements !== montantTotal) {
-      throw new BadRequestException('Paiements incorrects');
+    if (totalPaiements > montantTotal) {
+      throw new BadRequestException(
+        'Le total des paiements ne peut pas dépasser le montant de la vente',
+      );
+    }
+
+    const estVenteACredit = totalPaiements < montantTotal;
+    const montantDette = montantTotal - totalPaiements;
+
+    if (estVenteACredit && !clientId) {
+      throw new BadRequestException(
+        'Un client est requis pour enregistrer une vente à crédit (paiement partiel)',
+      );
+    }
+
+    // Si vente à crédit, on vérifie le client + le plafond de crédit avant d'ouvrir la transaction
+    if (estVenteACredit) {
+      const client = await this.prisma.client.findFirst({
+        where: { id: clientId, compteId },
+      });
+      if (!client) {
+        throw new BadRequestException('Client introuvable');
+      }
+
+      if (client.limiteCredit !== null && client.limiteCredit !== undefined) {
+        const dettesEnCours = await this.prisma.dette.aggregate({
+          where: { clientId, statut: 'EN_COURS' },
+          _sum: { montantRestant: true },
+        });
+
+        const detteActuelle = dettesEnCours._sum.montantRestant || 0;
+        const detteApresVente = detteActuelle + montantDette;
+
+        if (detteApresVente > client.limiteCredit) {
+          const disponible = client.limiteCredit - detteActuelle;
+          throw new BadRequestException(
+            `Plafond de crédit dépassé pour ${client.nom}. ` +
+            `Limite : ${client.limiteCredit.toLocaleString('fr-FR')} FCFA — ` +
+            `Dette actuelle : ${detteActuelle.toLocaleString('fr-FR')} FCFA — ` +
+            `Disponible : ${Math.max(disponible, 0).toLocaleString('fr-FR')} FCFA`,
+          );
+        }
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -81,6 +123,7 @@ export class VenteService {
           utilisateurId,
           compteId,
           montantTotal,
+          clientId: clientId ?? undefined,
         },
       });
 
@@ -105,8 +148,9 @@ export class VenteService {
         });
       }
 
-      // ================= PAIEMENTS =================
+      // ================= PAIEMENTS (uniquement ce qui est réellement reçu) =================
       for (const p of paiements) {
+        if (p.montant <= 0) continue; // ignore les paiements à 0 (cas: vente 100% à crédit)
         await tx.paiement.create({
           data: {
             venteId: vente.id,
@@ -116,17 +160,35 @@ export class VenteService {
         });
       }
 
-      // ================= MOUVEMENT CAISSE AUTO =================
-      await tx.mouvementCaisse.create({
-        data: {
-          compteId,
-          type: 'ENTREE',
-          source: 'VENTE',
-          montant: montantTotal,
-          motif: `Vente enregistrée (${lignes.length} produit(s))`,
-          venteId: vente.id,
-        },
-      });
+      // ================= MOUVEMENT CAISSE AUTO (seulement le montant encaissé) =================
+      if (totalPaiements > 0) {
+        await tx.mouvementCaisse.create({
+          data: {
+            compteId,
+            type: 'ENTREE',
+            source: 'VENTE',
+            montant: totalPaiements,
+            motif: estVenteACredit
+              ? `Vente à crédit — acompte reçu (${lignes.length} produit(s))`
+              : `Vente enregistrée (${lignes.length} produit(s))`,
+            venteId: vente.id,
+          },
+        });
+      }
+
+      // ================= CRÉATION DE LA DETTE (si paiement partiel) =================
+      if (estVenteACredit) {
+        await tx.dette.create({
+          data: {
+            compteId,
+            clientId,
+            venteId: vente.id,
+            montantInitial: montantDette,
+            montantRestant: montantDette,
+            statut: 'EN_COURS',
+          },
+        });
+      }
 
       return vente;
 
@@ -139,10 +201,12 @@ export class VenteService {
       where: { compteId },
       include: {
         utilisateur: true,
+        client: true,
         lignes: {
           include: { produit: true },
         },
         paiements: true,
+        dette: true,
       },
       orderBy: { creeLe: 'desc' },
     });
@@ -154,10 +218,14 @@ export class VenteService {
       where: { id, compteId },
       include: {
         utilisateur: true,
+        client: true,
         lignes: {
           include: { produit: true },
         },
         paiements: true,
+        dette: {
+          include: { remboursements: true },
+        },
       },
     });
 
@@ -190,15 +258,28 @@ export class VenteService {
   async remove(id: string, compteId: string) {
     const vente = await this.prisma.vente.findFirst({
       where: { id, compteId },
+      include: { dette: true },
     });
 
     if (!vente) {
       throw new NotFoundException('Vente introuvable');
     }
 
+    if (vente.dette && vente.dette.statut === 'EN_COURS') {
+      throw new BadRequestException(
+        'Impossible de supprimer cette vente : une dette est encore en cours sur ce client',
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
 
-      // Supprimer le mouvement caisse lié
+      if (vente.dette) {
+        await tx.remboursementDette.deleteMany({
+          where: { detteId: vente.dette.id },
+        });
+        await tx.dette.delete({ where: { id: vente.dette.id } });
+      }
+
       await tx.mouvementCaisse.deleteMany({
         where: { venteId: id },
       });
