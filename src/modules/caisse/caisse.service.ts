@@ -53,6 +53,58 @@ export class CaisseService {
     });
   }
 
+  // ================= DÉTAIL D'UN MOUVEMENT (selon sa source) =================
+  async getDetail(id: string, compteId: string) {
+    const mouvement = await this.prisma.mouvementCaisse.findFirst({
+      where: { id, compteId },
+    });
+
+    if (!mouvement) {
+      throw new BadRequestException('Mouvement introuvable');
+    }
+
+    // ===== VENTE : charge la vente complète (produits, client, dette, paiements) =====
+    if (mouvement.source === 'VENTE' && mouvement.venteId) {
+      const vente = await this.prisma.vente.findFirst({
+        where: { id: mouvement.venteId },
+        include: {
+          utilisateur: true,
+          client: true,
+          lignes: { include: { produit: true } },
+          paiements: true,
+          dette: { include: { remboursements: true } },
+        },
+      });
+
+      return { mouvement, type: 'VENTE', vente };
+    }
+
+    // ===== ACHAT_STOCK : charge l'entrée de stock (produit, fournisseur) =====
+    if (mouvement.source === 'ACHAT_STOCK' && mouvement.entreeStockId) {
+      const entreeStock = await this.prisma.entreeStock.findFirst({
+        where: { id: mouvement.entreeStockId },
+        include: { produit: true, fournisseur: true },
+      });
+
+      return { mouvement, type: 'ACHAT_STOCK', entreeStock };
+    }
+
+    // ===== DETTE : charge le remboursement + la dette + le client =====
+    if (mouvement.source === 'DETTE' && mouvement.remboursementId) {
+      const remboursement = await this.prisma.remboursementDette.findFirst({
+        where: { id: mouvement.remboursementId },
+        include: {
+          dette: { include: { client: true } },
+        },
+      });
+
+      return { mouvement, type: 'DETTE', remboursement };
+    }
+
+    // ===== MANUEL : rien de plus à charger =====
+    return { mouvement, type: 'MANUEL' };
+  }
+
   // ================= MOUVEMENT MANUEL =================
   async addManuel(compteId: string, dto: {
     type: 'ENTREE' | 'SORTIE';

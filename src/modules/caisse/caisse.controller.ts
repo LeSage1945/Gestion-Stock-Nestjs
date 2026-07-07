@@ -10,13 +10,19 @@ export class CaisseController {
   // ================= SOLDE =================
   @Get('solde')
   async getSolde(@Req() req: any) {
-    return this.caisseService.getSolde(req.user.compteId); // ← retourne directement
+    return this.caisseService.getSolde(req.user.compteId);
   }
 
   // ================= GET ALL =================
   @Get('all')
   getAll(@Req() req: any) {
     return this.caisseService.getAll(req.user.compteId);
+  }
+
+  // ================= DÉTAIL =================
+  @Get('detail/:id')
+  getDetail(@Param('id') id: string, @Req() req: any) {
+    return this.caisseService.getDetail(id, req.user.compteId);
   }
 
   // ================= MOUVEMENT MANUEL =================
