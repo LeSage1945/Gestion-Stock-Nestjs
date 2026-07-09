@@ -6,6 +6,7 @@ import {
 import { randomUUID } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateRemboursementDto } from './dto/create-dette.dto';
+import { CreateDetteManuelleDto } from './dto/create-dette-manuelle.dto';
 
 @Injectable()
 export class DetteService {
@@ -201,5 +202,51 @@ export class DetteService {
     ]);
 
     return { dette: detteMaj, message: 'Remboursement annulé avec succès' };
+  }
+
+  // ================= CRÉER UNE DETTE MANUELLE (sans vente, ex: ancienne dette) =================
+  async creerDetteManuelle(dto: CreateDetteManuelleDto, compteId: string) {
+    const client = await this.prisma.client.findFirst({
+      where: { id: dto.clientId, compteId },
+    });
+
+    if (!client) {
+      throw new NotFoundException('Client introuvable');
+    }
+
+    if (dto.montant <= 0) {
+      throw new BadRequestException('Le montant doit être supérieur à 0');
+    }
+
+    // Vérifier la limite de crédit du client, si définie
+    if (client.limiteCredit !== null) {
+      const totalEnCours = await this.prisma.dette.aggregate({
+        where: { clientId: dto.clientId, compteId, statut: 'EN_COURS' },
+        _sum: { montantRestant: true },
+      });
+
+      const montantActuel = totalEnCours._sum.montantRestant || 0;
+
+      if (montantActuel + dto.montant > client.limiteCredit) {
+        throw new BadRequestException(
+          `Cette dette dépasserait la limite de crédit du client (${client.limiteCredit.toLocaleString('fr-FR')} FCFA)`,
+        );
+      }
+    }
+
+    const dette = await this.prisma.dette.create({
+      data: {
+        compteId,
+        clientId: dto.clientId,
+        source: 'MANUELLE',
+        montantInitial: dto.montant,
+        montantRestant: dto.montant,
+      },
+      include: {
+        client: true,
+      },
+    });
+
+    return dette;
   }
 }

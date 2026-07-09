@@ -12,6 +12,7 @@ import {
 import { AuthGuard } from 'src/common/gards/auth/auth.guard';
 import { DetteService } from './dettes.service';
 import { CreateRemboursementDto } from './dto/create-dette.dto';
+import { CreateDetteManuelleDto } from './dto/create-dette-manuelle.dto';
 
 @UseGuards(AuthGuard)
 @Controller('dettes')
@@ -36,6 +37,12 @@ export class DetteController {
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.detteService.findOne(id, req.user.compteId);
+  }
+
+  // ← ajouté : création d'une dette manuelle (sans vente)
+  @Post('manuelle')
+  creerDetteManuelle(@Body() dto: CreateDetteManuelleDto, @Req() req: any) {
+    return this.detteService.creerDetteManuelle(dto, req.user.compteId);
   }
 
   @Post(':id/remboursement')
