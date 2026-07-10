@@ -71,6 +71,12 @@ enum StatutDette {
   SOLDEE
 }
 
+// ← ajouté
+enum SourceDette {
+  VENTE
+  MANUELLE
+}
+
 model Compte {
   id   String @id @default(uuid())
   code String @unique
@@ -96,7 +102,7 @@ model Compte {
   mouvementsCaisse MouvementCaisse[]
   commandes        Commande[]
   clients          Client[] // ← ajouté
-  dettes           Dette[]  // ← ajouté
+  dettes           Dette[] // ← ajouté
 }
 
 model Utilisateur {
@@ -105,6 +111,9 @@ model Utilisateur {
   nom        String
   email      String
   motDePasse String
+  telephone  String? // ← ajouté
+
+  photoUrl String?
 
   role   Role     @default(VENDEUR)
   creeLe DateTime @default(now())
@@ -271,8 +280,8 @@ model MouvementCaisse {
   entreeStockId   String? @unique
   remboursementId String? @unique // ← ajouté : trace le remboursement de dette à l'origine de ce mouvement
 
-  entreeStock    EntreeStock?         @relation("EntreeMouvement", fields: [entreeStockId], references: [id])
-  remboursement  RemboursementDette?  @relation(fields: [remboursementId], references: [id])
+  entreeStock   EntreeStock?        @relation("EntreeMouvement", fields: [entreeStockId], references: [id])
+  remboursement RemboursementDette? @relation(fields: [remboursementId], references: [id])
 }
 
 model Commande {
@@ -367,34 +376,6 @@ model Client {
 // ============================================================
 // ← NOUVEAU : DETTES (ventes à crédit)
 // ============================================================
-// model Dette {
-//   id String @id @default(uuid())
-
-//   compteId String
-//   compte   Compte @relation(fields: [compteId], references: [id])
-
-//   clientId String
-//   client   Client @relation(fields: [clientId], references: [id])
-
-//   venteId String @unique // une dette correspond à exactement une vente
-//   vente   Vente  @relation(fields: [venteId], references: [id])
-
-//   montantInitial Float // partie non payée au moment de la vente
-//   montantRestant Float // solde actuel, décrémenté à chaque remboursement
-
-//   statut StatutDette @default(EN_COURS)
-
-//   creeLe    DateTime @default(now())
-//   modifieLe DateTime @updatedAt
-
-//   remboursements RemboursementDette[]
-// }
-
-enum SourceDette {
-  VENTE
-  MANUELLE // ← ajouté : dette saisie manuellement (ex: ancienne dette, avant usage du logiciel)
-}
-
 model Dette {
   id String @id @default(uuid())
 
@@ -404,10 +385,12 @@ model Dette {
   clientId String
   client   Client @relation(fields: [clientId], references: [id])
 
-  venteId String? @unique // ← rendu optionnel : une dette manuelle n'a pas de vente
+  venteId String? @unique // ← rendu optionnel : null = dette manuelle/historique
   vente   Vente?  @relation(fields: [venteId], references: [id])
 
-  source SourceDette @default(VENTE) // ← ajouté : permet de distinguer l'origine
+  source SourceDette @default(VENTE) // ← ajouté : distingue vente à crédit / dette manuelle
+
+  motif String? // ← ajouté : utile pour les dettes manuelles ("Dette avant utilisation du logiciel", etc.)
 
   montantInitial Float
   montantRestant Float

@@ -18,7 +18,7 @@ export class ProduitService {
     createProduitDto: CreateProduitDto,
     compteId: string,
   ) {
-    const { nom, marque, prix, seuilAlerte } = createProduitDto;
+    const { nom, marque, prix, seuilAlerte, imageUrl } = createProduitDto;
 
     const existingProduit = await this.prismaService.produit.findFirst({
       where: {
@@ -39,6 +39,7 @@ export class ProduitService {
           marque,
           prix,
           seuilAlerte,
+          imageUrl,
           compteId, // 🔥 IMPORTANT SAAS
         },
       });
@@ -81,7 +82,7 @@ export class ProduitService {
     updateProduitDto: UpdateProduitDto,
     compteId: string,
   ) {
-    const { nom, marque, prix, seuilAlerte } = updateProduitDto;
+    const { nom, marque, prix, seuilAlerte, imageUrl } = updateProduitDto;
 
     const existingProduit = await this.prismaService.produit.findFirst({
       where: {
@@ -102,6 +103,7 @@ export class ProduitService {
           marque,
           prix,
           seuilAlerte,
+          imageUrl,
         },
       });
     } catch (error) {

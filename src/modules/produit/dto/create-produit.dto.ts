@@ -3,9 +3,9 @@ import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID, MaxLeng
 
 export class CreateProduitDto {
 
-    @IsOptional()  // ← ajouté
+    @IsOptional()
     @IsUUID()
-    id?: string    // ← optionnel
+    id?: string
 
     @IsNotEmpty({ message: 'Le nom est obligatoire' })
     @IsString({ message: 'Le nom doit être une chaîne de caractères' })
@@ -28,4 +28,8 @@ export class CreateProduitDto {
     @IsNumber({}, { message: 'Le seuil doit être un nombre' })
     @Min(0, { message: 'Le seuil ne peut pas être négatif' })
     seuilAlerte!: number;
+
+    @IsOptional()
+    @IsString({ message: "L'image doit être une chaîne de caractères (URL)" })
+    imageUrl?: string;
 }

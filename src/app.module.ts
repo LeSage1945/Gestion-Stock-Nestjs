@@ -23,6 +23,7 @@ import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { AdminMarketplaceModule } from './modules/admin-marketplac/admin-marketplac.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { DettesModule } from './modules/dettes/dettes.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 
 @Module({
@@ -45,7 +46,8 @@ import { DettesModule } from './modules/dettes/dettes.module';
     MarketplaceModule,
     AdminMarketplaceModule,
     ClientsModule,
-    DettesModule
+    DettesModule,
+    UploadModule
   ],
   controllers: [AppController],
   providers: [AppService],
