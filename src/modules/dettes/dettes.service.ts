@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateRemboursementDto } from './dto/create-dette.dto';
 import { CreateDetteManuelleDto } from './dto/create-dette-manuelle.dto';
+import { UpdateLimiteGlobaleDto } from './dto/update-limite-global.dto';
 
 @Injectable()
 export class DetteService {
@@ -77,6 +78,58 @@ export class DetteService {
     };
   }
 
+  // ================= LIMITE GLOBALE DE DETTES (au niveau du compte) =================
+  async getLimiteGlobale(compteId: string) {
+    const compte = await this.prisma.compte.findUnique({
+      where: { id: compteId },
+      select: { limiteGlobaleDette: true },
+    });
+
+    if (!compte) {
+      throw new NotFoundException('Compte introuvable');
+    }
+
+    return { limiteGlobale: compte.limiteGlobaleDette || 0 };
+  }
+
+  async setLimiteGlobale(compteId: string, dto: UpdateLimiteGlobaleDto) {
+    const compte = await this.prisma.compte.update({
+      where: { id: compteId },
+      data: { limiteGlobaleDette: dto.limiteGlobale },
+      select: { limiteGlobaleDette: true },
+    });
+
+    return { limiteGlobale: compte.limiteGlobaleDette || 0 };
+  }
+
+  // ================= VÉRIFICATION INTERNE DE LA LIMITE GLOBALE =================
+  // Réutilisable partout où une dette peut être créée (dette manuelle ET vente à crédit)
+  private async verifierLimiteGlobale(compteId: string, montantAjoute: number) {
+    const compte = await this.prisma.compte.findUnique({
+      where: { id: compteId },
+      select: { limiteGlobaleDette: true },
+    });
+
+    if (!compte?.limiteGlobaleDette) {
+      return; // pas de limite configurée, on laisse passer
+    }
+
+    const result = await this.prisma.dette.aggregate({
+      where: { compteId, statut: 'EN_COURS' },
+      _sum: { montantRestant: true },
+    });
+
+    const totalActuel = result._sum.montantRestant || 0;
+
+    if (totalActuel + montantAjoute > compte.limiteGlobaleDette) {
+      throw new BadRequestException(
+        `Cette opération dépasserait la limite globale de dettes autorisée ` +
+        `(${compte.limiteGlobaleDette.toLocaleString('fr-FR')} FCFA). ` +
+        `Total actuel dû : ${totalActuel.toLocaleString('fr-FR')} FCFA.`,
+      );
+    }
+  }
+
   // ================= REMBOURSEMENT =================
   async rembourser(detteId: string, dto: CreateRemboursementDto, compteId: string) {
     const dette = await this.prisma.dette.findFirst({
@@ -99,7 +152,7 @@ export class DetteService {
 
     const nouveauRestant = dette.montantRestant - dto.montant;
     const nouveauStatut = nouveauRestant <= 0 ? 'SOLDEE' : 'EN_COURS';
-    const remboursementId = randomUUID(); // généré à l'avance pour pouvoir le référencer dans le même lot
+    const remboursementId = randomUUID();
 
     const [detteMaj, remboursement] = await this.prisma.$transaction([
       this.prisma.dette.update({
@@ -233,6 +286,9 @@ export class DetteService {
         );
       }
     }
+
+    // ⚠️ AJOUT : vérification de la limite globale (tous clients confondus)
+    await this.verifierLimiteGlobale(compteId, dto.montant);
 
     const dette = await this.prisma.dette.create({
       data: {

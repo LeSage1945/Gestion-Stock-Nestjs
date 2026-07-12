@@ -88,6 +88,8 @@ model Compte {
   ville              String?
   visibleMarketplace Boolean @default(false)
 
+  limiteGlobaleDette  Float?
+
   categorieId String?
   categorie   Categorie? @relation(fields: [categorieId], references: [id])
 

@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -13,6 +14,7 @@ import { AuthGuard } from 'src/common/gards/auth/auth.guard';
 import { DetteService } from './dettes.service';
 import { CreateRemboursementDto } from './dto/create-dette.dto';
 import { CreateDetteManuelleDto } from './dto/create-dette-manuelle.dto';
+import { UpdateLimiteGlobaleDto } from './dto/update-limite-global.dto';
 
 @UseGuards(AuthGuard)
 @Controller('dettes')
@@ -65,5 +67,15 @@ export class DetteController {
     @Req() req: any,
   ) {
     return this.detteService.annulerRemboursement(remboursementId, req.user.compteId);
+  }
+
+  @Get('limite-globale')
+  getLimiteGlobale(@Req() req) {
+    return this.detteService.getLimiteGlobale(req.user.compteId);
+  }
+
+  @Put('limite-globale')
+  setLimiteGlobale(@Body() dto: UpdateLimiteGlobaleDto, @Req() req) {
+    return this.detteService.setLimiteGlobale(req.user.compteId, dto);
   }
 }
